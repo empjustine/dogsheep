@@ -1,0 +1,26 @@
+{
+  "plugins": {
+    "datasette-render-timestamps": {
+      "columnns": [],
+      "format": "%Y-%m-%dT%H:%M:%S"
+    }
+  },
+  "databases": {
+    "pocket.db": {
+      "tables": {
+        "items": {
+          "plugins": {
+            "datasette-render-timestamps": {
+              "__columns__": [
+                "time_added",
+                "time_updated",
+                "time_read",
+                "time_favorited"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
