@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import contextlib
 import json
-import pathlib
 import shlex
 import sqlite3
 import subprocess
@@ -28,23 +27,34 @@ def _get_internet_archive_data(_url):
 
 
 def main():
-    with sqlite3_autocommit_connection(pathlib.Path("pocket.db")) as con:
+    with sqlite3_autocommit_connection(":memory:") as con:
+        con.execute("ATTACH DATABASE 'pocket.db' as pocket;")
+        con.execute("ATTACH DATABASE 'internetarchive.db' as internetarchive;")
         con.execute("PRAGMA journal_mode=WAL")
         con.execute("PRAGMA synchronous=NORMAL")
         _read_cursor = con.cursor()
         _write_cursor = con.cursor()
         _read_cursor.execute(
-            "CREATE TABLE IF NOT EXISTS items_internet_archive(item_id, data)"
+            "CREATE TABLE IF NOT EXISTS internetarchive.page(item_id, data)"
         )
         for _item in _read_cursor.execute(
-            "SELECT item_id, given_url FROM items WHERE item_id NOT IN (SELECT item_id FROM items_internet_archive)"
+            "SELECT pocket.items.item_id, COALESCE(pocket.items.given_url, pocket.items.resolved_url) AS given_url "
+            "FROM pocket.items "
+            "WHERE COALESCE(pocket.items.given_url, pocket.items.resolved_url) IS NOT NULL "
+            "AND item_id NOT IN ("
+            "SELECT internetarchive.page.item_id "
+            "FROM internetarchive.page"
+            ")"
         ):
             _item_id, _given_url = _item
             _data = _get_internet_archive_data(_given_url)
-            print({"_item_id": _item_id, "_given_url": _given_url, "_data": _data})
+            print({"_data": _data})
             _write_cursor.execute(
-                "INSERT INTO items_internet_archive(item_id, data) VALUES (?, ?)",
-                [_item_id, json.dumps(_data, ensure_ascii=False)],
+                "INSERT INTO internetarchive.page(item_id, data) VALUES (?, ?)",
+                [
+                    _item_id,
+                    json.dumps(_data, ensure_ascii=False, separators=(",", ":")),
+                ],
             )
 
 
